@@ -1,0 +1,35 @@
+/* Core Form Styles */
+.opensrs-ssl-form {
+    max-width: 800px !important;
+    margin: 2rem auto !important;
+    padding: 2rem !important;
+    background: #fff !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Input Field Overrides */
+.opensrs-ssl-form input[type="text"],
+.opensrs-ssl-form input[type="email"],
+.opensrs-ssl-form input[type="tel"],
+.opensrs-ssl-form input[type="number"],
+.opensrs-ssl-form select,
+.opensrs-ssl-form textarea {
+    width: 100% !important;
+    padding: 0.75rem !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+    background: #fff !important;
+    font-size: 1rem !important;
+}
+
+/* Force Button Styling */
+.opensrs-ssl-form button[type="submit"] {
+    background: #3498db !important;
+    color: white !important;
+    padding: 1rem 2rem !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-size: 1rem !important;
+    cursor: pointer !important;
+}
