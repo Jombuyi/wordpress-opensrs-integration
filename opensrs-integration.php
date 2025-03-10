@@ -13,25 +13,21 @@
 */
 
 
-if (!defined('ABSPATH')) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly.
+}
 
 // Define plugin constants
-define('OPENSRS_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('OPENSRS_PLUGIN_URL', plugin_dir_url(__FILE__));
+define( 'OSRS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'OSRS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-// Load required files
-require_once OPENSRS_PLUGIN_PATH . 'includes/class-opensrs-integration.php';
-require_once OPENSRS_PLUGIN_PATH . 'includes/class-opensrs-api.php';
-require_once OPENSRS_PLUGIN_PATH . 'includes/class-opensrs-form.php';
+// Include necessary files
+require_once OSRS_PLUGIN_DIR . 'includes/class-opensrs-integration.php';
+require_once OSRS_PLUGIN_DIR . 'includes/class-opensrs-api.php';
+require_once OSRS_PLUGIN_DIR . 'includes/class-opensrs-form.php';
 
 // Initialize the plugin
-add_action('plugins_loaded', function() {
-    OpenSRS_Integration::instance();
-});
+$opensrs_integration = Opensrs_Integration::get_instance();
 
-// Add settings link
-add_filter('plugin_action_links_' . plugin_basename(__FILE__), function($links) {
-    $settings_link = '<a href="' . admin_url('options-general.php?page=opensrs-settings') . '">Settings</a>';
-    array_unshift($links, $settings_link);
-    return $links;
-});
+// Register activation hook if needed
+register_activation_hook( __FILE__, array( 'Opensrs_Integration', 'activate' ) );

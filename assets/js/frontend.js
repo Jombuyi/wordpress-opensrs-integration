@@ -1,31 +1,36 @@
-// assets/js/frontend.js
-jQuery(function ($) {
-    $('.opensrs-form').on('submit', function (e) {
+jQuery(document).ready(function ($) {
+    // Add a new SAN field when the "+" button is clicked
+    $('#add-san').on('click', function (e) {
         e.preventDefault();
-        const $form = $(this);
-        const $response = $form.find('.form-response');
-        const $spinner = $form.find('.spinner');
+        var sanCount = $('#sans-fields input[name="sans[]"]').length;
+        var newField = '<p><label for="sans_' + sanCount + '">SAN:</label>' +
+            '<input type="text" id="sans_' + sanCount + '" name="sans[]" placeholder="Enter SAN" /></p>';
+        $('#sans-fields').append(newField);
+    });
 
-        $spinner.show();
-        $response.hide().removeClass('success error');
+    // Handle the form submission via AJAX
+    $('#opensrs-form').on('submit', function (e) {
+        e.preventDefault();
+        var formData = $(this).serialize();
+        $('#opensrs-loading').show();
+        $('#opensrs-response').empty();
 
         $.ajax({
-            url: opensrsData.ajaxurl,
+            url: opensrs_ajax_obj.ajax_url,
             type: 'POST',
-            data: {
-                action: 'opensrs_submit',
-                nonce: opensrsData.nonce,
-                data: $form.serialize()
+            data: formData + '&action=opensrs_form_submit&nonce=' + opensrs_ajax_obj.nonce,
+            dataType: 'json',
+            success: function (response) {
+                $('#opensrs-loading').hide();
+                if (response.success) {
+                    $('#opensrs-response').html('<span style="color: green;">' + response.data.message + '</span>');
+                } else {
+                    $('#opensrs-response').html('<span style="color: red;">' + response.data.message + '</span>');
+                }
             },
-            success: function (res) {
-                $response.show().addClass('success').text(res.data);
-            },
-            error: function (xhr) {
-                const error = xhr.responseJSON?.data || 'An error occurred';
-                $response.show().addClass('error').text(error);
-            },
-            complete: function () {
-                $spinner.hide();
+            error: function () {
+                $('#opensrs-loading').hide();
+                $('#opensrs-response').html('<span style="color: red;">An error occurred. Please try again.</span>');
             }
         });
     });

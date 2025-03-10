@@ -1,109 +1,128 @@
 <?php
-/* includes/class-opensrs-integration.php - Core Plugin Functionality */
-class OpenSRS_Integration {
-    private static $instance = null;
-    public $features = [
-        'contact_form' => [
-            'label' => 'Contact Form',
-            'options' => [
-                'phone' => 'Require Phone Number',
-                'gdpr' => 'Enable GDPR Checkbox'
-            ]
-        ],
-        'newsletter' => [
-            'label' => 'Newsletter Signup',
-            'options' => [
-                'double_optin' => 'Enable Double Opt-In'
-            ]
-        ]
-    ];
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-    public static function instance() {
-        if (null === self::$instance) {
+class Opensrs_Integration {
+    private static $instance;
+
+    public static function get_instance() {
+        if ( null === self::$instance ) {
             self::$instance = new self();
         }
         return self::$instance;
     }
 
-    private function __construct() {
-        // Hook into WordPress
-        add_action('admin_menu', [$this, 'add_settings_page']);
-        add_action('add_meta_boxes', [$this, 'add_meta_boxes']);
-        add_action('save_post', [$this, 'save_post_meta']);
-        add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
-        add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
-        add_action('wp_ajax_opensrs_submit', [$this, 'handle_ajax_submission']);
-        add_action('wp_ajax_nopriv_opensrs_submit', [$this, 'handle_ajax_submission']);
-        add_action('wp_footer', [$this, 'render_frontend_form']);
+    public function __construct() {
+        // Add settings page under the WordPress Settings menu
+        add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
+        add_action( 'admin_init', array( $this, 'register_settings' ) );
+
+        // Add meta boxes for OpenSRS settings on products, pages (and posts if needed)
+        add_action( 'add_meta_boxes', array( $this, 'add_opensrs_meta_box' ) );
+        add_action( 'save_post', array( $this, 'save_opensrs_meta_box_data' ) );
+
+        // Enqueue admin assets (if additional styles needed)
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+
+        // Enqueue frontend assets (CSS, JS)
+        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
+
+        // AJAX handler for form submission
+        add_action( 'wp_ajax_opensrs_form_submit', array( $this, 'handle_form_submission' ) );
+        add_action( 'wp_ajax_nopriv_opensrs_form_submit', array( $this, 'handle_form_submission' ) );
     }
 
-    /**
-     * Add OpenSRS settings page to the WordPress admin menu.
-     */
-    public function add_settings_page() {
+    public static function activate() {
+        // Activation tasks (e.g., creating tables if needed) can be added here.
+    }
+
+    /* -------------------------------
+     * Admin Settings Page: OpenSRS API Settings
+     * ------------------------------- */
+    public function register_settings_page() {
         add_options_page(
-            'OpenSRS Settings',
-            'OpenSRS',
+            'OpenSRS API Settings',
+            'OpenSRS API Settings',
             'manage_options',
-            'opensrs-settings',
-            [$this, 'render_settings_page']
+            'opensrs-api-settings',
+            array( $this, 'settings_page_html' )
         );
-        register_setting('opensrs_settings', 'opensrs_settings');
     }
 
-    /**
-     * Render the OpenSRS settings page.
-     */
-    public function render_settings_page() {
+    public function register_settings() {
+        register_setting( 'opensrs_api_settings_group', 'opensrs_api_key' );
+        register_setting( 'opensrs_api_settings_group', 'opensrs_environment' );
+
+        add_settings_section(
+            'opensrs_api_settings_section',
+            'OpenSRS API Settings',
+            null,
+            'opensrs-api-settings'
+        );
+
+        add_settings_field(
+            'opensrs_api_key',
+            'API Key',
+            array( $this, 'api_key_field_callback' ),
+            'opensrs-api-settings',
+            'opensrs_api_settings_section'
+        );
+
+        add_settings_field(
+            'opensrs_environment',
+            'Environment',
+            array( $this, 'environment_field_callback' ),
+            'opensrs-api-settings',
+            'opensrs_api_settings_section'
+        );
+    }
+
+    public function api_key_field_callback() {
+        $api_key = esc_attr( get_option( 'opensrs_api_key', '' ) );
+        echo "<input type='text' name='opensrs_api_key' value='$api_key' class='regular-text' />";
+    }
+
+    public function environment_field_callback() {
+        $env = esc_attr( get_option( 'opensrs_environment', 'sandbox' ) );
+        ?>
+        <select name="opensrs_environment">
+            <option value="sandbox" <?php selected( $env, 'sandbox' ); ?>>Sandbox</option>
+            <option value="production" <?php selected( $env, 'production' ); ?>>Production</option>
+        </select>
+        <?php
+    }
+
+    public function settings_page_html() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
         ?>
         <div class="wrap">
-            <h1>OpenSRS Settings</h1>
+            <h1>OpenSRS API Settings</h1>
             <form method="post" action="options.php">
                 <?php
-                settings_fields('opensrs_settings');
-                do_settings_sections('opensrs-settings');
+                settings_fields( 'opensrs_api_settings_group' );
+                do_settings_sections( 'opensrs-api-settings' );
+                submit_button();
                 ?>
-                <table class="form-table">
-                    <tr>
-                        <th scope="row">API Key</th>
-                        <td>
-                            <input type="text" name="opensrs_settings[api_key]" value="<?= esc_attr(get_option('opensrs_settings')['api_key'] ?? '') ?>" class="regular-text">
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Environment</th>
-                        <td>
-                            <select name="opensrs_settings[environment]">
-                                <option value="sandbox" <?= selected(get_option('opensrs_settings')['environment'] ?? '', 'sandbox') ?>>Sandbox</option>
-                                <option value="production" <?= selected(get_option('opensrs_settings')['environment'] ?? '', 'production') ?>>Production</option>
-                            </select>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Sidebar Position</th>
-                        <td>
-                            <select name="opensrs_settings[sidebar_position]">
-                                <option value="left" <?= selected(get_option('opensrs_settings')['sidebar_position'] ?? '', 'left') ?>>Left</option>
-                                <option value="right" <?= selected(get_option('opensrs_settings')['sidebar_position'] ?? '', 'right') ?>>Right</option>
-                            </select>
-                        </td>
-                    </tr>
-                </table>
-                <?php submit_button(); ?>
             </form>
         </div>
         <?php
     }
 
-    /**
-     * Add meta boxes to posts, pages, and products.
-     */
-    public function add_meta_boxes() {
-        foreach (['post', 'page', 'product'] as $post_type) {
+    /* -------------------------------
+     * Meta Box for Page/Product Settings
+     * ------------------------------- */
+    public function add_opensrs_meta_box() {
+        // Add to pages and WooCommerce products (if exists). You can also add to posts if needed.
+        $post_types = array('page');
+        if ( post_type_exists( 'product' ) ) {
+            $post_types[] = 'product';
+        }
+        foreach ( $post_types as $post_type ) {
             add_meta_box(
-                'opensrs-settings',
-                'OpenSRS Settings',
-                [$this, 'render_meta_box'],
+                'opensrs_meta_box',
+                'OpenSRS Form Settings',
+                array( $this, 'render_meta_box' ),
                 $post_type,
                 'side',
                 'default'
@@ -111,100 +130,127 @@ class OpenSRS_Integration {
         }
     }
 
-    /**
-     * Render the meta box content.
-     */
-    public function render_meta_box($post) {
-        wp_nonce_field('opensrs_meta_nonce', 'opensrs_meta_nonce');
-        $active = get_post_meta($post->ID, '_opensrs_active', true);
-        $feature = get_post_meta($post->ID, '_opensrs_feature', true);
-        $options = get_post_meta($post->ID, '_opensrs_options', true);
+    public function render_meta_box( $post ) {
+        // Use a nonce field for security
+        wp_nonce_field( 'opensrs_meta_box_nonce_action', 'opensrs_meta_box_nonce' );
+
+        // Retrieve current settings (if any)
+        $enable_opensrs = get_post_meta( $post->ID, '_opensrs_enable', true );
+        $linked_product = get_post_meta( $post->ID, '_opensrs_linked_product', true );
+
+        // If WooCommerce is active, get list of products for dropdown selection
+        $products = array();
+        if ( post_type_exists( 'product' ) ) {
+            $args = array(
+                'post_type' => 'product',
+                'posts_per_page' => -1,
+                'post_status' => 'publish'
+            );
+            $product_query = new WP_Query( $args );
+            if ( $product_query->have_posts() ) {
+                while ( $product_query->have_posts() ) {
+                    $product_query->the_post();
+                    $products[get_the_ID()] = get_the_title();
+                }
+                wp_reset_postdata();
+            }
+        }
         ?>
         <p>
             <label>
-                <input type="checkbox" name="opensrs_active" value="1" <?= checked($active, 1) ?>> Enable OpenSRS
+                <input type="checkbox" name="opensrs_enable" value="1" <?php checked( $enable_opensrs, '1' ); ?> />
+                Enable OpenSRS
             </label>
         </p>
         <p>
-            <label for="opensrs_feature">Select Feature:</label>
-            <select name="opensrs_feature" id="opensrs_feature">
-                <option value="">— Select —</option>
-                <?php foreach ($this->features as $key => $feature_data) : ?>
-                    <option value="<?= esc_attr($key) ?>" <?= selected($feature, $key) ?>><?= esc_html($feature_data['label']) ?></option>
+            <label for="opensrs_linked_product">Link SSL Product:</label>
+            <select name="opensrs_linked_product" id="opensrs_linked_product" style="width:100%;">
+                <option value="">-- Select Product --</option>
+                <?php foreach ( $products as $id => $title ) : ?>
+                    <option value="<?php echo esc_attr( $id ); ?>" <?php selected( $linked_product, $id ); ?>>
+                        <?php echo esc_html( $title ); ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
         </p>
-        <div class="opensrs-options">
-            <?php foreach ($this->features as $key => $feature_data) : ?>
-                <div class="opensrs-option-group" data-feature="<?= esc_attr($key) ?>" style="display: <?= $feature === $key ? 'block' : 'none' ?>;">
-                    <?php foreach ($feature_data['options'] as $option_key => $option_label) : ?>
-                        <label>
-                            <input type="checkbox" name="opensrs_options[]" value="<?= esc_attr($option_key) ?>" <?= checked(in_array($option_key, (array)$options)) ?>> <?= esc_html($option_label) ?>
-                        </label><br>
-                    <?php endforeach; ?>
-                </div>
-            <?php endforeach; ?>
-        </div>
         <?php
     }
 
-    /**
-     * Save meta box data.
-     */
-    public function save_post_meta($post_id) {
-        if (!isset($_POST['opensrs_meta_nonce']) || !wp_verify_nonce($_POST['opensrs_meta_nonce'], 'opensrs_meta_nonce')) return;
+    public function save_opensrs_meta_box_data( $post_id ) {
+        // Verify nonce
+        if ( ! isset( $_POST['opensrs_meta_box_nonce'] ) || ! wp_verify_nonce( $_POST['opensrs_meta_box_nonce'], 'opensrs_meta_box_nonce_action' ) ) {
+            return;
+        }
+        // Avoid autosave and permission issues
+        if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+            return;
+        }
+        if ( isset( $_POST['post_type'] ) && 'page' === $_POST['post_type'] ) {
+            if ( ! current_user_can( 'edit_page', $post_id ) ) {
+                return;
+            }
+        } else {
+            if ( ! current_user_can( 'edit_post', $post_id ) ) {
+                return;
+            }
+        }
 
-        update_post_meta($post_id, '_opensrs_active', (int)($_POST['opensrs_active'] ?? 0));
-        update_post_meta($post_id, '_opensrs_feature', sanitize_text_field($_POST['opensrs_feature'] ?? ''));
-        update_post_meta($post_id, '_opensrs_options', array_map('sanitize_text_field', $_POST['opensrs_options'] ?? []));
+        // Save the checkbox value
+        $enable = isset( $_POST['opensrs_enable'] ) ? '1' : '';
+        update_post_meta( $post_id, '_opensrs_enable', $enable );
+
+        // Save the linked product selection
+        $linked_product = isset( $_POST['opensrs_linked_product'] ) ? sanitize_text_field( $_POST['opensrs_linked_product'] ) : '';
+        update_post_meta( $post_id, '_opensrs_linked_product', $linked_product );
     }
 
-    /**
-     * Enqueue admin scripts and styles.
-     */
-    public function admin_scripts($hook) {
-        if ('post.php' !== $hook) return;
-        wp_enqueue_style('opensrs-admin', OPENSRS_PLUGIN_URL . 'assets/css/admin.css');
-        wp_enqueue_script('opensrs-admin', OPENSRS_PLUGIN_URL . 'assets/js/admin.js', ['jquery'], null, true);
-    }
-
-    /**
-     * Enqueue frontend scripts and styles.
-     */
-    public function frontend_scripts() {
-        if (!is_singular()) return;
-        wp_enqueue_style('opensrs-frontend', OPENSRS_PLUGIN_URL . 'assets/css/frontend.css');
-        wp_enqueue_script('opensrs-frontend', OPENSRS_PLUGIN_URL . 'assets/js/frontend.js', ['jquery'], null, true);
-        wp_localize_script('opensrs-frontend', 'opensrsData', [
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('opensrs_form_nonce')
-        ]);
-    }
-
-    /**
-     * Handle AJAX form submissions.
-     */
-    public function handle_ajax_submission() {
-        check_ajax_referer('opensrs_form_nonce', 'nonce');
-
-        try {
-            $api = new OpenSRS_API();
-            $response = $api->submit_form($_POST);
-            wp_send_json_success($response);
-        } catch (Exception $e) {
-            wp_send_json_error($e->getMessage());
+    /* -------------------------------
+     * Enqueue Assets
+     * ------------------------------- */
+    public function enqueue_admin_assets( $hook ) {
+        // Load only on post edit screens and settings page
+        if ( in_array( $hook, array('post.php', 'post-new.php', 'settings_page_opensrs-api-settings') ) ) {
+            // Example: enqueue a custom admin CSS file if desired
+            wp_enqueue_style( 'opensrs-admin', OSRS_PLUGIN_URL . 'assets/css/admin.css' );
         }
     }
 
-    /**
-     * Render the frontend form in the footer.
-     */
-    public function render_frontend_form() {
-        if (!is_singular()) return;
-        $post_id = get_the_ID();
-        if (!get_post_meta($post_id, '_opensrs_active', true)) return;
+    public function enqueue_frontend_assets() {
+        wp_enqueue_style( 'opensrs-frontend', OSRS_PLUGIN_URL . 'assets/css/frontend.css' );
+        wp_enqueue_script( 'opensrs-frontend', OSRS_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), false, true );
+        wp_localize_script( 'opensrs-frontend', 'opensrs_ajax_obj', array(
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce'    => wp_create_nonce( 'opensrs_form_nonce' )
+        ) );
+    }
 
-        $form = new OpenSRS_Form($post_id);
-        $form->render();
+    /* -------------------------------
+     * AJAX Form Submission Handler
+     * ------------------------------- */
+    public function handle_form_submission() {
+        // Verify nonce
+        check_ajax_referer( 'opensrs_form_nonce', 'nonce' );
+
+        // Retrieve and sanitize submitted data
+        $ssl_duration = isset( $_POST['ssl_duration'] ) ? sanitize_text_field( $_POST['ssl_duration'] ) : '';
+        $sans         = isset( $_POST['sans'] ) ? array_map( 'sanitize_text_field', $_POST['sans'] ) : array();
+        $contact      = isset( $_POST['contact'] ) ? sanitize_text_field( $_POST['contact'] ) : '';
+
+        // Prepare data for the API
+        $data = array(
+            'ssl_duration' => $ssl_duration,
+            'sans'         => $sans,
+            'contact'      => $contact,
+        );
+
+        // Process the request using the OpenSRS API class
+        $api = new Opensrs_API();
+        $response = $api->send_request( $data );
+
+        if ( isset( $response['success'] ) && $response['success'] ) {
+            wp_send_json_success( array( 'message' => 'SSL enrollment successful!' ) );
+        } else {
+            wp_send_json_error( array( 'message' => 'Error processing SSL enrollment.' ) );
+        }
     }
 }

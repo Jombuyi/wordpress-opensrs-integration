@@ -1,56 +1,32 @@
-/* assets/css/frontend.css */
-.opensrs-sidebar {
-    position: fixed;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 300px;
-    background: #fff;
-    padding: 20px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    z-index: 9999;
+/* Frontend styling for the OpenSRS form container */
+#opensrs-form-container {
+    background: #f9f9f9;
+    padding: 15px;
+    border: 1px solid #ddd;
+    max-width: 300px;
+    margin: 20px auto;
 }
 
-.opensrs-right {
-    right: 20px;
+#opensrs-form label {
+    display: block;
+    margin-bottom: 5px;
 }
 
-.opensrs-left {
-    left: 20px;
-}
-
-.opensrs-form input,
-.opensrs-form button {
+#opensrs-form input[type="text"] {
     width: 100%;
+    padding: 5px;
     margin-bottom: 10px;
+    box-sizing: border-box;
 }
 
-.spinner {
-    display: none;
+#opensrs-form button {
+    padding: 8px 12px;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    cursor: pointer;
 }
 
-.spinner img {
-    width: 20px;
-    height: 20px;
-}
-
-.form-response {
-    margin: 10px 0;
-    padding: 10px;
-    display: none;
-}
-
-.form-response.success {
-    background: #dff0d8;
-}
-
-.form-response.error {
-    background: #f2dede;
-}
-
-@media (max-width: 768px) {
-    .opensrs-sidebar {
-        width: 90%;
-        left: 5%;
-        right: auto;
-    }
+#opensrs-form button:hover {
+    background: #005177;
 }
